@@ -1,2 +1,2 @@
 # numerical_methods
-contains Matrix. class
+contains Matrix.class
