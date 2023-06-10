@@ -3,6 +3,7 @@ import random
 import numpy as np
 from fractions import Fraction
 from numbers import Number
+import matplotlib.pyplot as plt
 
 
 class TextBlock:
@@ -103,7 +104,7 @@ class Matrix:
         # multiplication righthanded only (matrix*number)
         if isinstance(other, Matrix):
             assert self.width == other.height, f"Shapes does not match: {self.shape} != {other.shape}"
-            matrix = self.zero(self.height, other.width, self[0, 0] - self[0, 0])
+            matrix = FullMatrix.zero(self.height, other.width, self[0, 0] - self[0, 0])
             for r in range(self.height):
                 for c in range(other.width):
                     acc = None
@@ -509,30 +510,31 @@ class BandMatrix(Matrix):
                     l[i, j] = (self[i, j] - temp[i, j]) * u.invert_element(u[j, j])
         return l, u
 
+
 class ToeplitzMatrix(Matrix):
     """
     Матрица Тёплица.
     """
+
     def __init__(self, data):
         """
         Создает объект, хранящий матрицу в виде np.ndarray `data`.
         """
         assert isinstance(data, np.ndarray)
         self.data = data
-        self._height = len(data)
-        self._width = self._height
 
     @property
     def width(self):
-        return self.shape[0]
+        return int((self.data.shape[0] + 1) / 2)
 
     @property
     def height(self):
-        return self.shape[0]
+        return int((self.data.shape[0] + 1) / 2)
 
     @property
     def shape(self):
-        return [self.shape[0], self.shape[0]]
+        real_shape = (int((self.shape[0] + 1) / 2), int((self.shape[0] + 1) / 2))
+        return real_shape
 
     @property
     def dtype(self):
@@ -540,12 +542,12 @@ class ToeplitzMatrix(Matrix):
 
     def __getitem__(self, key):
         row, column = key
-        return self.data[abs(row - column)]
+        return self.data[row - column]
 
     def __setitem__(self, key, value):
-        #a[i,j] = a.s[i-j(mod n)]
+        # a[i,j] = a.s[i-j(mod n)]
         row, column = key
-        self.data[abs(row - column)] = value
+        self.data[row - column] = value
 
     def empty_like(self, width=None, height=None):
         dtype = self.data.dtype
@@ -556,52 +558,61 @@ class ToeplitzMatrix(Matrix):
         data = np.empty((height, width), dtype=dtype)
         return ToeplitzMatrix(data)
 
-    '''
-    def transpone(self):
-        matrix = self.zero(self.width, self.height, self[0, 0] - self[0, 0])
-        for i in range(self.width):
-            for j in range(self.height):
-                matrix[i, j] = self[j, i]
-        return matrix
-
-    
-
-    def ident_like(self, width=None, height=None):
-        dtype = self.data.dtype
-        if width is None:
-            width = self.data.shape[1]
-        if height is None:
-            height = self.data.shape[0]
-        data = np.empty((height, width), dtype=dtype)
-        for i in range(self.height):
-            data[i, i] = self[i, i] * self.invert_element(self[i, i])
-        return ToeplitzMatrix(data)
-
     @classmethod
-    def zero(_cls, height, width, default=0, low_bandw=0, upp_bandw=0):
+    def zero(_cls, height, width, default=0.0, low_bandw=0, upp_bandw=0):
         """
         Создает матрицу размера `width` x `height` со значениями по умолчанию `default`.
         """
-        data = np.empty((height, width), dtype=type(default))
+        data = np.empty(height + width - 1, dtype=type(default))
         data[:] = default
         return ToeplitzMatrix(data)
-        
-    def solve_levi(self, vector):
-        vec_result
-        return vec_result
-    '''
 
-error = 1e-10
+    def solve_levi(self, vector):
+        assert vector.height == self.width, "Vector size does not conduct with matrix" + " v - " + str(
+            vector.height) + " m - " + str(self.width)
+        to = [0.0] * self.height
+        back = [0.0] * self.height
+        vec_res = [0.0] * self.height
+        to[0] = [self.invert_element(self[0, 0])]
+        back[0] = [self.invert_element(self[0, 0])]
+        vec_res[0] = [vector[0, 0] / self[0, 0]]
+
+        for i in range(self.height - 1):
+            forw = to[i]
+            backw = back[i]
+            e_to = 0
+            e_back = 0
+            for j in range(i + 1):
+                e_to += self[i + 1, j] * forw[j]
+                e_back += self[0, j + 1] * backw[j]
+            det = 1 - e_to * e_back
+            to[i + 1] = 1 / det * np.concatenate((to[i], [0])) - e_to / det * np.concatenate(([0], back[i]))
+            back[i + 1] = to[i + 1][::-1]
+
+        for i in range(self.height - 1):
+            e_to = 0
+            res_temp = vec_res[i]
+            for j in range(i + 1):
+                e_to += self[i + 1, j] * res_temp[j]
+            vec_res[i + 1] = np.concatenate([vec_res[i], [0]]) + (vector[i + 1, 0] - e_to) * back[i + 1]
+        len_res = len(vec_res)
+        x_v = FullMatrix.zero(len_res, 1, 0.0)
+        for i in range(len_res):
+            x_v[i, 0] = vec_res[self.height - 1][i]
+        return x_v
+
+
+numerical_error = 1e-10
 
 
 def equal(a, b):
     if isinstance(a, Number) and isinstance(b, Number):
-        if abs(a - b) < error:
+        if abs(a - b) < numerical_error:
             return True
         else:
             return False
     if isinstance(a, Fraction) and isinstance(b, Fraction):
-        if abs(a - b) < error:
+        if abs(a - b) < numerical_error:
             return True
         else:
             return False
@@ -614,3 +625,43 @@ def equal(a, b):
                     return True
         return True
     raise TypeError
+
+def laplace(n):
+    mat = np.zeros((n, n, n, n), dtype=int)
+    for i1 in range(n):
+        for i2 in range(n):
+            mat[i1, i2, i1, i2] = -4
+            mat[i1, i2, (i1- 1 ) % n, i2] = 1
+            mat[i1, i2, (i1 + 1) % n, i2] = 1
+            mat[i1, i2, i1, (i2 - 1) % n] = 1
+            mat[i1, i2, i1, (i2 + 1) % n] = 1
+    mat_res = mat.reshape((pow(n, 2), pow(n, 2)))
+    return mat, mat_res
+
+def D(n):
+    mat, mat_res = laplace(n)
+    mat_toep = ToeplitzMatrix.zero(len(mat_res[0, :]),len(mat_res[0, :]),0.0)
+    for i in range(len(mat_res[0, :])):
+        mat_toep[0,i] = mat_res[0,i]
+        mat_toep[i,0] = mat_res[0,i]
+    return mat_toep, mat_res
+
+def vectors(n):
+    sample = np.linspace(-1, 1, n)
+    x_v = np.ravel([[not_homogen_part(x, y) for x in sample] for y in sample])
+    x_v -= np.sum(x_v.T)
+    d = D(n)[0]
+    mat_d = FullMatrix.zero(d.height,d.width,0.0)
+    for i in range(d.height):
+        for j in range(d.width):
+            mat_d[i,j] = d[i,j]
+    y_v = mat_d.data.dot(x_v.T)
+    X = FullMatrix.zero(len(x_v),1,0.0)
+    Y = FullMatrix.zero(len(x_v),1,0.0)
+    for i in range(len(x_v)):
+        X[i,0] = x_v[i]
+        Y[i,0] = y_v[i]
+    return X, Y, x_v, y_v
+
+def not_homogen_part(x, y):
+    return np.cos(np.pi * x) * np.cos(np.pi * y)
