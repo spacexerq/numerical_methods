@@ -626,42 +626,46 @@ def equal(a, b):
         return True
     raise TypeError
 
+
 def laplace(n):
     mat = np.zeros((n, n, n, n), dtype=int)
     for i1 in range(n):
         for i2 in range(n):
             mat[i1, i2, i1, i2] = -4
-            mat[i1, i2, (i1- 1 ) % n, i2] = 1
+            mat[i1, i2, (i1 - 1) % n, i2] = 1
             mat[i1, i2, (i1 + 1) % n, i2] = 1
             mat[i1, i2, i1, (i2 - 1) % n] = 1
             mat[i1, i2, i1, (i2 + 1) % n] = 1
     mat_res = mat.reshape((pow(n, 2), pow(n, 2)))
     return mat, mat_res
 
+
 def D(n):
     mat, mat_res = laplace(n)
-    mat_toep = ToeplitzMatrix.zero(len(mat_res[0, :]),len(mat_res[0, :]),0.0)
+    mat_toep = ToeplitzMatrix.zero(len(mat_res[0, :]), len(mat_res[0, :]), 0.0)
     for i in range(len(mat_res[0, :])):
-        mat_toep[0,i] = mat_res[0,i]
-        mat_toep[i,0] = mat_res[0,i]
+        mat_toep[0, i] = mat_res[0, i]
+        mat_toep[i, 0] = mat_res[0, i]
     return mat_toep, mat_res
+
 
 def vectors(n):
     sample = np.linspace(-1, 1, n)
     x_v = np.ravel([[not_homogen_part(x, y) for x in sample] for y in sample])
     x_v -= np.sum(x_v.T)
     d = D(n)[0]
-    mat_d = FullMatrix.zero(d.height,d.width,0.0)
+    mat_d = FullMatrix.zero(d.height, d.width, 0.0)
     for i in range(d.height):
         for j in range(d.width):
-            mat_d[i,j] = d[i,j]
+            mat_d[i, j] = d[i, j]
     y_v = mat_d.data.dot(x_v.T)
-    X = FullMatrix.zero(len(x_v),1,0.0)
-    Y = FullMatrix.zero(len(x_v),1,0.0)
+    X = FullMatrix.zero(len(x_v), 1, 0.0)
+    Y = FullMatrix.zero(len(x_v), 1, 0.0)
     for i in range(len(x_v)):
-        X[i,0] = x_v[i]
-        Y[i,0] = y_v[i]
+        X[i, 0] = x_v[i]
+        Y[i, 0] = y_v[i]
     return X, Y, x_v, y_v
+
 
 def not_homogen_part(x, y):
     return np.cos(np.pi * x) * np.cos(np.pi * y)
