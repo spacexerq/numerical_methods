@@ -706,9 +706,6 @@ def not_homogen_part(x, y):
 
 
 def fourier(num_values):
-    matrix = D(num_values)[0]
-    x, y, x_v, y_v = vectors(num_values)
-    vec_result = matrix.solve_levi(y)
     num_sample = np.linspace(-1, 1, num_values)
     x_analyt = [[not_homogen_part(x, y) for x in num_sample] for y in num_sample]
     x_analyt -= np.sum(x_analyt)
