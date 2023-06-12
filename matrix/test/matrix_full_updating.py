@@ -233,6 +233,7 @@ class Matrix:
         raise NotImplementedError
 
     def solve(self, vector):
+        # only for invertible matrices
         if isinstance(vector, Matrix):
             assert vector.width == 1 and self.width == vector.height and self.height == self.width, f"Vector or matrix shape is wrong: {self.shape}, {vector.shape}"
             garbage, l, u, p = self.lup()
@@ -265,6 +266,7 @@ class Matrix:
         q = FullMatrix.empty_like(self)
         u = FullMatrix.empty_like(self)
         u[:, 0] = self[:, 0].data
+        print(u[:, 0])
         q[:, 0] = u[:, 0] / np.linalg.norm(u[:, 0])
 
         for i in range(1, height):
@@ -633,7 +635,7 @@ class ToeplitzMatrix(Matrix):
         return x_v
 
 
-numerical_error = 1e-8
+numerical_error = 9e-7
 
 
 def equal(a, b):
@@ -658,15 +660,16 @@ def equal(a, b):
     raise TypeError
 
 
-def laplace(n):
+def laplace(n, n2=float(random.randrange(0, 10000))):
     mat = np.zeros((n, n, n, n), dtype=int)
+    n1 = -4 * n2
     for i1 in range(n):
         for i2 in range(n):
-            mat[i1, i2, i1, i2] = -4
-            mat[i1, i2, (i1 - 1) % n, i2] = 1
-            mat[i1, i2, (i1 + 1) % n, i2] = 1
-            mat[i1, i2, i1, (i2 - 1) % n] = 1
-            mat[i1, i2, i1, (i2 + 1) % n] = 1
+            mat[i1, i2, i1, i2] = n1
+            mat[i1, i2, (i1 - 1) % n, i2] = n2
+            mat[i1, i2, (i1 + 1) % n, i2] = n2
+            mat[i1, i2, i1, (i2 - 1) % n] = n2
+            mat[i1, i2, i1, (i2 + 1) % n] = n2
     mat_res = mat.reshape((pow(n, 2), pow(n, 2)))
     return mat, mat_res
 
@@ -700,3 +703,22 @@ def vectors(n):
 
 def not_homogen_part(x, y):
     return np.cos(np.pi * x) * np.cos(np.pi * y)
+
+
+def fourier(num_values):
+    matrix = D(num_values)[0]
+    x, y, x_v, y_v = vectors(num_values)
+    vec_result = matrix.solve_levi(y)
+    num_sample = np.linspace(-1, 1, num_values)
+    x_analyt = [[not_homogen_part(x, y) for x in num_sample] for y in num_sample]
+    x_analyt -= np.sum(x_analyt)
+    x_analyt = np.ravel(x_analyt)
+    mat, mat_res = laplace(num_values)
+    F_laplace = np.fft.ifft2(np.fft.fft2(mat, axes=[0, 1]), axes=[2, 3])
+    y = mat_res.dot(x_analyt.T)
+    F_y = np.fft.fft2(y.reshape((num_values, num_values)))
+    diagonal = np.array([F_laplace.reshape((num_values ** 2, num_values ** 2))[i, i] for i in range(num_values ** 2)])
+    F_x = np.ravel(F_y) / diagonal
+    F_x[0] = 0
+    result = mat_res.dot(np.fft.ifft2((F_x.reshape((num_values, num_values)))).reshape((num_values ** 2,)).T)
+    return result, y
