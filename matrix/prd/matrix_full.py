@@ -261,36 +261,79 @@ class Matrix:
         return NotImplemented
 
     def qr(self):
-        height = self.height
-        width = self.width
+        # old version some mistakes
         q = FullMatrix.empty_like(self)
         u = FullMatrix.empty_like(self)
         u[:, 0] = self[:, 0].data
-        print(u[:, 0])
+        # q[:, 0] = u[:, 0] / np.sqrt(np.sum(u[:, 0] ** 2))
         q[:, 0] = u[:, 0] / np.linalg.norm(u[:, 0])
-
-        for i in range(1, height):
+        for i in range(1, self.height):
             u[:, i] = self[:, i].data
             for j in range(i):
-                scal = np.sum([self.data[k, i] * q.data[k, j] for k in range(height)])
-                u[:, i] -= (scal * q[:, j]).data
+                scal1 = np.sum([self.data[k, i] * q.data[k, j] for k in range(self.height)])
+                scal = np.sum([self[k, i] * q[k, j] for k in range(self.height)])
+                u[:, i] -= (scal * q[:, j])
             q[:, i] = u[:, i] / np.linalg.norm(u[:, i])
-        R = FullMatrix.zero(self.width, self.width, 0.)
-        for i in range(height):
-            for j in range(i, width):
-                R[i, j] = self.data[:, j] @ q.data[:, i]
+        r = FullMatrix.zero(self.width, self.width, 0.0)
+        for i in range(self.height):
+            for j in range(i, self.width):
+                r[i, j] = self[:, j].dot(q[:, i])
+        return q, r
 
-        return q, R
+    def qr_new(self):
+        # gram_schmidt complete for any sizes
+        q = FullMatrix.zero(self.height, self.height, 0.0)
+        cnt = 0
+        num_rows = self.width
+        num_cols = self.height
+        mat_tr = self.transpone()
+        for i in range(num_rows):
+            u = mat_tr[i, :]
+            for j in range(0, cnt):
+                temp = q[:, j] @ mat_tr[i, :]
+                temp *= q[:, j]
+                u -= temp
+            e = u / np.linalg.norm(u.data)
+            q[:, cnt] = e
+            cnt += 1
+        r = q.transpone() * self
+        return q, r
 
-    def lls_qr(self, y):
-        q, r = np.linalg.qr(self.data)
+    def lsm_qr(self):
+        assert self.width == 2, "Vector array of points has incorrect shape, needs (n,2) has: "
+        num_values = self.height
+        A = FullMatrix.zero(num_values, 2, 1.0)
+        A[:, 0] = self[:, 0]
+        y = FullMatrix.zero(num_values, 1, 0.0)
+        y[:, 0] = self[:, 1]
+        q_A, r_A = A.qr_new()
+        r = r_A.data
         r_trunc = r[:r.shape[1], :]
-        q_trunc = q[:, :r.shape[1]]
-        x = FullMatrix.zero(r.shape[1], 1, 0.)
-        qy = q_trunc.T.dot(y.data)
-        for i in range(1, r.shape[1] + 1):
-            x[-i, 0] = (qy[-i] - (r_trunc[-i, :-i:-1].dot(x.data[:-i:-1, 0]))) / r_trunc[-i, -i]
-        return x
+        x = FullMatrix.zero(r_A.width, 1, 0.)
+        qy = q_A.transpone() * y
+        for i in range(r.shape[1], 0, -1):
+            x[i - 1, 0] = (qy[i - 1, 0] - (r_trunc[i - 1, :i - 1:-1].dot(x.data[:i - 1:-1, 0]))) / r_trunc[i - 1, i - 1]
+        Ax = A.data.dot(x.data)
+        x_sample = self[:, 0].data
+        return list(x_sample), Ax
+
+    def lsm_svd(self):
+        assert self.width == 2, "Vector array of points has incorrect shape, needs (n,2) has: "
+        num_values = self.height
+        A = FullMatrix.zero(num_values, 2, 1.0)
+        A[:, 0] = self[:, 0]
+        y = FullMatrix.zero(num_values, 1, 0.0)
+        y[:, 0] = self[:, 1]
+        u, sigma, vt = np.linalg.svd(self.data)
+        sigma = np.diag(sigma)
+        print(u)
+        print(sigma)
+        print(vt)
+        sigma_inv = np.linalg.inv(sigma)
+        print(sigma_inv)
+        matrix = u@sigma_inv@vt
+        x = matrix@y.data
+        return self[:, 0].data, x
 
 
 class FullMatrix(Matrix):
@@ -371,10 +414,18 @@ class FullMatrix(Matrix):
 
     def __getitem__(self, key):
         row, column = key
+        if type(row) == int and row < 0:
+            row = self.width - row % self.width
+        if type(column) == int and column < 0:
+            column = self.height - column % self.height
         return self.data[row, column]
 
     def __setitem__(self, key, value):
         row, column = key
+        if type(row) == int and row < 0:
+            row = self.width - row % self.width
+        if type(column) == int and column < 0:
+            column = self.height - column % self.height
         self.data[row, column] = value
 
 
@@ -411,15 +462,21 @@ class SymmetricMatrix(Matrix):
     def lu(self):
         # cholecky decomposition used for this (l i not more uni-left-triangle)
         matrix = FullMatrix.zero(self.width, self.height, self[0, 0] - self[0, 0])
+        matrix[0,0] = np.sqrt(self[0,0])
         for i in range(self.height):
             for j in range(i + 1):
                 temp = 0
                 for k in range(j):
-                    temp += matrix[i, k] * matrix[j, k]
+                    sl1 = matrix[i, k]
+                    sl2 = matrix[j, k]
+                    plus = sl1 * sl2
+                    temp += plus
                 if i == j:
                     matrix[i, j] = np.sqrt(self[i, i] - temp)
                 else:
-                    matrix[i, j] = (self[i, j] - temp) * matrix.invert_element(matrix[j, j])
+                    print(matrix[j, j])
+                    inv = matrix.invert_element(matrix[j, j])
+                    matrix[i, j] = (self[i, j] - temp) * inv
         l, u = FullMatrix.zero(self.width, self.height, self[0, 0] - self[0, 0]), FullMatrix.zero(self.width,
                                                                                                   self.height,
                                                                                                   self[0, 0] - self[
