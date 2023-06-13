@@ -280,7 +280,7 @@ class Matrix:
 
         return q, R
 
-    def lls_qr(self, y):
+    def solve_qr(self, y):
         q, r = np.linalg.qr(self.data)
         r_trunc = r[:r.shape[1], :]
         q_trunc = q[:, :r.shape[1]]
