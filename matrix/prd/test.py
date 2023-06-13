@@ -1,4 +1,4 @@
-from matrix_full_updating import *
+from matrix_full import *
 
 
 def test_lu():
