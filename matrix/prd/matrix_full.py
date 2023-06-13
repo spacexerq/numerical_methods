@@ -233,6 +233,7 @@ class Matrix:
         raise NotImplementedError
 
     def solve(self, vector):
+        # only for invertible matrices
         if isinstance(vector, Matrix):
             assert vector.width == 1 and self.width == vector.height and self.height == self.width, f"Vector or matrix shape is wrong: {self.shape}, {vector.shape}"
             garbage, l, u, p = self.lup()
@@ -258,6 +259,81 @@ class Matrix:
                     temp += u[i - 1, j] * result[j, 0]
             return result
         return NotImplemented
+
+    def qr(self):
+        # old version some mistakes
+        q = FullMatrix.empty_like(self)
+        u = FullMatrix.empty_like(self)
+        u[:, 0] = self[:, 0].data
+        # q[:, 0] = u[:, 0] / np.sqrt(np.sum(u[:, 0] ** 2))
+        q[:, 0] = u[:, 0] / np.linalg.norm(u[:, 0])
+        for i in range(1, self.height):
+            u[:, i] = self[:, i].data
+            for j in range(i):
+                scal1 = np.sum([self.data[k, i] * q.data[k, j] for k in range(self.height)])
+                scal = np.sum([self[k, i] * q[k, j] for k in range(self.height)])
+                u[:, i] -= (scal * q[:, j])
+            q[:, i] = u[:, i] / np.linalg.norm(u[:, i])
+        r = FullMatrix.zero(self.width, self.width, 0.0)
+        for i in range(self.height):
+            for j in range(i, self.width):
+                r[i, j] = self[:, j].dot(q[:, i])
+        return q, r
+
+    def qr_new(self):
+        # gram_schmidt complete for any sizes
+        q = FullMatrix.zero(self.height, self.height, 0.0)
+        cnt = 0
+        num_rows = self.width
+        num_cols = self.height
+        mat_tr = self.transpone()
+        for i in range(num_rows):
+            u = mat_tr[i, :]
+            for j in range(0, cnt):
+                temp = q[:, j] @ mat_tr[i, :]
+                temp *= q[:, j]
+                u -= temp
+            e = u / np.linalg.norm(u.data)
+            q[:, cnt] = e
+            cnt += 1
+        r = q.transpone() * self
+        return q, r
+
+    def lsm_qr(self):
+        assert self.width == 2, "Vector array of points has incorrect shape, needs (n,2) has: "
+        num_values = self.height
+        A = FullMatrix.zero(num_values, 2, 1.0)
+        A[:, 0] = self[:, 0]
+        y = FullMatrix.zero(num_values, 1, 0.0)
+        y[:, 0] = self[:, 1]
+        q_A, r_A = A.qr_new()
+        r = r_A.data
+        r_trunc = r[:r.shape[1], :]
+        x = FullMatrix.zero(r_A.width, 1, 0.)
+        qy = q_A.transpone() * y
+        for i in range(r.shape[1], 0, -1):
+            x[i - 1, 0] = (qy[i - 1, 0] - (r_trunc[i - 1, :i - 1:-1].dot(x.data[:i - 1:-1, 0]))) / r_trunc[i - 1, i - 1]
+        Ax = A.data.dot(x.data)
+        x_sample = self[:, 0].data
+        return list(x_sample), Ax
+
+    def lsm_svd(self):
+        assert self.width == 2, "Vector array of points has incorrect shape, needs (n,2) has: "
+        num_values = self.height
+        A = FullMatrix.zero(num_values, 2, 1.0)
+        A[:, 0] = self[:, 0]
+        y = FullMatrix.zero(num_values, 1, 0.0)
+        y[:, 0] = self[:, 1]
+        u, sigma, vt = np.linalg.svd(self.data)
+        sigma = np.diag(sigma)
+        print(u)
+        print(sigma)
+        print(vt)
+        sigma_inv = np.linalg.inv(sigma)
+        print(sigma_inv)
+        matrix = u@sigma_inv@vt
+        x = matrix@y.data
+        return self[:, 0].data, x
 
 
 class FullMatrix(Matrix):
@@ -338,10 +414,18 @@ class FullMatrix(Matrix):
 
     def __getitem__(self, key):
         row, column = key
+        if type(row) == int and row < 0:
+            row = self.width - row % self.width
+        if type(column) == int and column < 0:
+            column = self.height - column % self.height
         return self.data[row, column]
 
     def __setitem__(self, key, value):
         row, column = key
+        if type(row) == int and row < 0:
+            row = self.width - row % self.width
+        if type(column) == int and column < 0:
+            column = self.height - column % self.height
         self.data[row, column] = value
 
 
@@ -378,15 +462,21 @@ class SymmetricMatrix(Matrix):
     def lu(self):
         # cholecky decomposition used for this (l i not more uni-left-triangle)
         matrix = FullMatrix.zero(self.width, self.height, self[0, 0] - self[0, 0])
+        matrix[0,0] = np.sqrt(self[0,0])
         for i in range(self.height):
             for j in range(i + 1):
                 temp = 0
                 for k in range(j):
-                    temp += matrix[i, k] * matrix[j, k]
+                    sl1 = matrix[i, k]
+                    sl2 = matrix[j, k]
+                    plus = sl1 * sl2
+                    temp += plus
                 if i == j:
                     matrix[i, j] = np.sqrt(self[i, i] - temp)
                 else:
-                    matrix[i, j] = (self[i, j] - temp) * matrix.invert_element(matrix[j, j])
+                    print(matrix[j, j])
+                    inv = matrix.invert_element(matrix[j, j])
+                    matrix[i, j] = (self[i, j] - temp) * inv
         l, u = FullMatrix.zero(self.width, self.height, self[0, 0] - self[0, 0]), FullMatrix.zero(self.width,
                                                                                                   self.height,
                                                                                                   self[0, 0] - self[
@@ -602,7 +692,7 @@ class ToeplitzMatrix(Matrix):
         return x_v
 
 
-numerical_error = 1e-10
+numerical_error = 9e-7
 
 
 def equal(a, b):
@@ -627,15 +717,16 @@ def equal(a, b):
     raise TypeError
 
 
-def laplace(n):
+def laplace(n, n2=float(random.randrange(0, 10000))):
     mat = np.zeros((n, n, n, n), dtype=int)
+    n1 = -4 * n2
     for i1 in range(n):
         for i2 in range(n):
-            mat[i1, i2, i1, i2] = -4
-            mat[i1, i2, (i1 - 1) % n, i2] = 1
-            mat[i1, i2, (i1 + 1) % n, i2] = 1
-            mat[i1, i2, i1, (i2 - 1) % n] = 1
-            mat[i1, i2, i1, (i2 + 1) % n] = 1
+            mat[i1, i2, i1, i2] = n1
+            mat[i1, i2, (i1 - 1) % n, i2] = n2
+            mat[i1, i2, (i1 + 1) % n, i2] = n2
+            mat[i1, i2, i1, (i2 - 1) % n] = n2
+            mat[i1, i2, i1, (i2 + 1) % n] = n2
     mat_res = mat.reshape((pow(n, 2), pow(n, 2)))
     return mat, mat_res
 
@@ -669,3 +760,19 @@ def vectors(n):
 
 def not_homogen_part(x, y):
     return np.cos(np.pi * x) * np.cos(np.pi * y)
+
+
+def fourier(num_values):
+    num_sample = np.linspace(-1, 1, num_values)
+    x_analyt = [[not_homogen_part(x, y) for x in num_sample] for y in num_sample]
+    x_analyt -= np.sum(x_analyt)
+    x_analyt = np.ravel(x_analyt)
+    mat, mat_res = laplace(num_values)
+    F_laplace = np.fft.ifft2(np.fft.fft2(mat, axes=[0, 1]), axes=[2, 3])
+    y = mat_res.dot(x_analyt.T)
+    F_y = np.fft.fft2(y.reshape((num_values, num_values)))
+    diagonal = np.array([F_laplace.reshape((num_values ** 2, num_values ** 2))[i, i] for i in range(num_values ** 2)])
+    F_x = np.ravel(F_y) / diagonal
+    F_x[0] = 0
+    result = mat_res.dot(np.fft.ifft2((F_x.reshape((num_values, num_values)))).reshape((num_values ** 2,)).T)
+    return result, y
