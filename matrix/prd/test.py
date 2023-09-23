@@ -2,7 +2,7 @@ from matrix_full import *
 
 
 def test_lu():
-    num_sample = [1,3,10,100,250,400]
+    num_sample = [1, 3, 10, 100, 250, 400]
     for n in num_sample:
         m_full = FullMatrix.zero(n, n, float)
         for i in range(n):
@@ -65,7 +65,7 @@ def test_fourier():
     for n in num_sample:
         n_real = 4 * n
         res, y_res = fourier(n_real)
-        if not any(np.abs(res - y_res) <= numerical_error):
+        if not np.any(np.abs(res - y_res) <= numerical_error):
             print("Fourier transformation does not complete")
             return -1
     return 0
@@ -77,12 +77,12 @@ def test_qr_lsm():
         vector = FullMatrix.zero(n, 2, 0.0)
         for i in range(n):
             for j in range(2):
-                vector[i,j] = float(random.randrange(-10000, 10000))
+                vector[i, j] = float(random.randrange(-10000, 10000))
         x, y = vector.lsm_qr()
         res_poly = np.polyfit(x, vector[:, 1].data, 1)
         res_poly = res_poly.flatten()
         poly_np = np.poly1d(res_poly)
-        if not np.any(np.abs(poly_np(x)-y) <= numerical_error):
+        if not np.any(np.abs(poly_np(x) - y) <= numerical_error):
             print("Error in least sqares method (by QR)")
             return -1
     return 0
