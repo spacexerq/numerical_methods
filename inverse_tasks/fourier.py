@@ -30,12 +30,12 @@ def funct_integrate(low_bord, up_bord, step, t_sample):
     sample = np.linspace(low_bord, up_bord, int((up_bord - low_bord) / step))
     integral = np.empty_like(t_sample)
     for j in range(len(t_sample)):
-        tau = low_bord
+        tau = np.linspace(low_bord, up_bord, int((up_bord - low_bord) / step))
         t = t_sample[j]
         integral_step = 0
         for i in range(len(sample)):
-            integral_step += core(beta, t - tau, dt, a) * x_func(tau, f0, mu)
-            tau += step
+            int_coord = (tau[i]-tau[i-1])/2
+            integral_step += core(beta, t - int_coord, dt, a) * x_func(int_coord, f0, mu) * step
         integral[j] = integral_step
     return integral
 
@@ -47,19 +47,20 @@ integ = funct_integrate(0, 0.03, 0.001, t_sample)
 # plt.show()
 # plt.plot(t_sample, core(beta, t_sample, dt, a))
 # plt.show()
-# plt.plot(t_sample, integ)
-# plt.show()
+plt.plot(t_sample, integ)
+plt.show()
 
-alpha = 1
+alpha = 0.001
 
 f_noise = integ
-core_out = core(beta,t_sample,dt,a)
+core_out = core(beta, t_sample, dt, a)
 core_out_conj = core_out.conjugate()
 f_fourier = np.fft.fft(f_noise)
 core_fourier = np.fft.fft(core_out)
 core_fourier_conj = np.fft.fft(core_out_conj)
-x_freq = f_fourier*core_fourier/(core_fourier_conj*core_fourier + alpha*moduller(np.fft.fftfreq(len(t_sample),t_sample[1]-t_sample[0])))
+x_freq = f_fourier * core_fourier / (core_fourier_conj * core_fourier + alpha * moduller(
+    np.fft.fftfreq(len(t_sample), t_sample[1] - t_sample[0])))
 x_freq_inv = np.real(np.fft.ifft(x_freq))
 plt.plot(x_freq_inv)
-plt.plot(x_func(t_sample,f0,mu))
+plt.plot(x_func(t_sample, f0, mu))
 plt.show()
