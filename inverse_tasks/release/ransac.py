@@ -1,4 +1,3 @@
-import methods_num
 import numpy as np
 import matplotlib.pyplot as plt
 from cycler import cycler
@@ -141,9 +140,10 @@ while True:
         plt.plot(result_x, result_y, "o", color="black", markersize=5)
         plt.plot(sample_x, sample_y, "o", color="green", markersize=2.5)
         plt.plot([x_out_min, x_out_max], [y_out_min, y_out_max], color="red", linewidth=2, label="RANSAC")
-        lstsqr(sample)
+        k_lsqr = lstsqr(sample)["k"]
         plt.legend()
         plt.show()
+        print("k sample:", round(k_sample, 3), "k RANSAC:", round(k_out, 3), "k LsSqr:", round(k_lsqr, 3))
         flag = "No"
     else:
         print('\n' + "RANSAC did not find the solution")
