@@ -12,6 +12,7 @@ def report_noisy_core():
     error_ex = np.empty(sample_betas)
     error_ex_1 = np.empty(sample_betas)
     f_noise = make_noisy(f1, t1)
+
     for i in range(sample_betas):
         a = optimal_alpha(sigma, k_(t, betas[i]), f_noise)
         xs[i] = tikhanov_regularization(f_noise, k_(t, betas[i]), t, a)[:t.shape[0]]
