@@ -1,18 +1,24 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from cycler import cycler
-import random as rd
-from matplotlib.animation import FuncAnimation
-from methods_num import *
 from scipy.fft import fftfreq, fft, ifft
 from scipy import optimize as opt
 
-
 # Int[K(t, tau) x(tau) {a,b,tau}] = f(t)
+A = 0.5
+delta_t = 2 * 1e-3
+beta = 3 * 1e3
+f0 = 300
+mu = 8 * 1e5
+a = 0
+b = 0.005
+N = 1000
+h = (b - a) / N
+t = np.linspace(a, b, N)
 
-def core(t, tau):
-    result = np.exp(-beta * t) + A * np.exp(-beta * t - delta_t)
-    # result = np.exp(-beta * t)
+
+def core(t_l, tau):
+    result = np.exp(-beta * t_l) + A * np.exp(-beta * t_l - delta_t)
+    # result = np.exp(-beta * t_l)
     return result
 
 
@@ -78,45 +84,38 @@ def alpha_hist_output(t_l, h_l, sigma_loc):
     f1_n_loc = make_noisy(f1_loc, t1_loc, sigma_l=sigma_loc)
     plt.plot(t1_loc, f1_n_loc)
     plt.show()
-    plt.text(-7, 20,  "sigma = " + str(sigma_loc), bbox=dict(boxstyle="round",
-                   ec=(1., 0.5, 0.5),
-                   fc=(1., 0.8, 0.8),
-                   ))
+    plt.text(-7, 20, "sigma = " + str(sigma_loc), bbox=dict(boxstyle="round",
+                                                            ec=(1., 0.5, 0.5),
+                                                            fc=(1., 0.8, 0.8),
+                                                            ))
     plt.hist(np.log(np.abs(alpha1)))
     plt.show()
 
 
-A = 0.5
-delta_t = 2 * 1e-3
-beta = 3 * 1e3
-f0 = 300
-mu = 8 * 1e5
-a = 0
-b = 0.005
-h = 1e-1
-# N = int((b-a)/h)
-N = 1000
-t = np.linspace(a, b, N)
+def report_regularization():
+    # N = 1000
+    # exact solution
+    x_exact_plt = x_var(t)
+    plt.plot(t, x_exact_plt, label="Exact x")
+    plt.show()
 
-# exact solution
-x_exact_plt = x_var(t)
-plt.plot(t, x_exact_plt, label="Exact x")
-plt.show()
+    # noisy function
+    f1, t1 = exact_solution(t, h)
+    f1_n = make_noisy(f1, t1, sigma_l=1e-1)
+    plt.plot(t1, f1_n)
+    plt.show()
+    # finding x via regularization
+    sol_tikh = tikhonov_regular(f1_n, core(t, 0), h, alpha=1e-2)
+    plt.plot(t, x_var(t))
+    plt.plot(t, sol_tikh[:t.shape[0]], '--')
+    plt.show()
 
-# noisy function
-f1, t1 = exact_solution(t, h)
-f1_n = make_noisy(f1, t1, sigma_l=1e-1)
-plt.plot(t1, f1_n)
-plt.show()
-# finding x via regularization
-sol_tikh = tikhonov_regular(f1_n, core(t, 0), h, alpha=1e-2)
-plt.plot(t, x_var(t))
-plt.plot(t, sol_tikh[:t.shape[0]], '--')
-plt.show()
+    sigma0 = 1e-3
+    sigma1 = 5e-1
+    sigma2 = 1e0
+    alpha_hist_output(t, h, sigma0)
+    alpha_hist_output(t, h, sigma1)
+    alpha_hist_output(t, h, sigma2)
 
-sigma0 = 1e-3
-sigma1 = 5e-1
-sigma2 = 1e0
-alpha_hist_output(t, h, sigma0)
-alpha_hist_output(t, h, sigma1)
-alpha_hist_output(t, h, sigma2)
+
+#report_regularization()

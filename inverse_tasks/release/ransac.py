@@ -1,8 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from cycler import cycler
 import random as rd
-from matplotlib.animation import FuncAnimation
 
 
 def minmax_(array):
@@ -100,54 +98,58 @@ def lstsqr(array):
     return {"k": m, "b": c}
 
 
-flag = "Y"
-dispersion = 1
-while True:
-    if flag != "Y":
-        print("Calculation finish.")
-        break
-    else:
-        dispersion = round(dispersion * 1.5)
-    n_noise = 50
-    n = 500
-    sample = [[0, 0]] * (n_noise + n)
-    x_upper_lim = 100
-    x_lower_lim = 0
-    sigma_noise = 4
-    noise_upper_lim = round(100 / np.e * sigma_noise)
-    noise_lower_lim = 0
-    for i in range(n_noise):
-        sample[i] = [rd.randint(x_lower_lim, x_upper_lim), rd.randint(noise_lower_lim, noise_upper_lim)]
-    k_sample = 0.7
-    for i in range(n):
-        x_temp = rd.randint(x_lower_lim, x_upper_lim)
-        y_noise = rd.gauss(mu=50, sigma=sigma_noise)
-        sample[i + n_noise] = [x_temp, k_sample * x_temp + y_noise]
-    test_sample = [[1, 1], [1, 10], [2, 3], [3, 2], [4, 5], [5, 4], [6, 8], [7, 5], [8, 8], [9, 10], [10, 10]]
-    sample_x = list(zip(*sample))[0]
-    sample_y = list(zip(*sample))[1]
-    result, k_out, b_out, len_out, iterations = ransac(sample, dispersion, prob_ratio=0.85, show_steps=False)
-    print("Number of iterations calculated:", iterations)
-    plt.plot(sample_x, sample_y, "o", color="green", markersize=2.5)
-    if len(result) != 0:
-        print("Result found for", dispersion, "dispersion")
-        result_x = list(zip(*result))[0]
-        result_y = list(zip(*result))[1]
-        x_out_min = minmax_(result)["x_min"]
-        x_out_max = minmax_(result)["x_max"]
-        y_out_min = str_line(x_out_min, k_out, b_out)
-        y_out_max = str_line(x_out_max, k_out, b_out)
-        plt.plot(result_x, result_y, "o", color="black", markersize=5)
+def report_ransac(input_flag=0):
+    flag = "Y"
+    dispersion = 1
+    while True:
+        if flag != "Y":
+            print("Calculation finish.")
+            break
+        else:
+            dispersion = round(dispersion * 1.5)
+        n_noise = 50
+        n = 500
+        sample = [[0, 0]] * (n_noise + n)
+        x_upper_lim = 100
+        x_lower_lim = 0
+        sigma_noise = 4
+        noise_upper_lim = round(100 / np.e * sigma_noise)
+        noise_lower_lim = 0
+        for i in range(n_noise):
+            sample[i] = [rd.randint(x_lower_lim, x_upper_lim), rd.randint(noise_lower_lim, noise_upper_lim)]
+        k_sample = 0.7
+        for i in range(n):
+            x_temp = rd.randint(x_lower_lim, x_upper_lim)
+            y_noise = rd.gauss(mu=50, sigma=sigma_noise)
+            sample[i + n_noise] = [x_temp, k_sample * x_temp + y_noise]
+        test_sample = [[1, 1], [1, 10], [2, 3], [3, 2], [4, 5], [5, 4], [6, 8], [7, 5], [8, 8], [9, 10], [10, 10]]
+        sample_x = list(zip(*sample))[0]
+        sample_y = list(zip(*sample))[1]
+        result, k_out, b_out, len_out, iterations = ransac(sample, dispersion, prob_ratio=0.85, show_steps=False)
+        print("Number of iterations calculated:", iterations)
         plt.plot(sample_x, sample_y, "o", color="green", markersize=2.5)
-        plt.plot([x_out_min, x_out_max], [y_out_min, y_out_max], color="red", linewidth=2, label="RANSAC")
-        k_lsqr = lstsqr(sample)["k"]
-        plt.legend()
-        plt.show()
-        print("k sample:", round(k_sample, 3), "k RANSAC:", round(k_out, 3), "k LsSqr:", round(k_lsqr, 3))
-        flag = "No"
-    else:
-        print('\n' + "RANSAC did not find the solution")
-        print("Result for", dispersion, "dispersion")
-        print("Do you want to repeat with higher dispersion?")
-        print("Y/N?")
-        flag = input()
+        if len(result) != 0:
+            print("Result found for", dispersion, "dispersion")
+            result_x = list(zip(*result))[0]
+            result_y = list(zip(*result))[1]
+            x_out_min = minmax_(result)["x_min"]
+            x_out_max = minmax_(result)["x_max"]
+            y_out_min = str_line(x_out_min, k_out, b_out)
+            y_out_max = str_line(x_out_max, k_out, b_out)
+            plt.plot(result_x, result_y, "o", color="black", markersize=5)
+            plt.plot(sample_x, sample_y, "o", color="green", markersize=2.5)
+            plt.plot([x_out_min, x_out_max], [y_out_min, y_out_max], color="red", linewidth=2, label="RANSAC")
+            k_lsqr = lstsqr(sample)["k"]
+            plt.legend()
+            plt.show()
+            print("k sample:", round(k_sample, 3), "k RANSAC:", round(k_out, 3), "k LsSqr:", round(k_lsqr, 3))
+            flag = "No"
+        else:
+            print('\n' + "RANSAC did not find the solution")
+            print("Result for", dispersion, "dispersion")
+            print("Do you want to repeat with higher dispersion?")
+            print("Y/N?")
+            if input_flag:
+                flag = input()
+            else:
+                flag = "Y"
