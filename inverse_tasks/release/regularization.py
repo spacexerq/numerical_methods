@@ -24,8 +24,8 @@ def x_var(var):
 def exact_solution(t_l, h_l):
     x_exact = x_var(t_l)
     core_loc = core(t_l, 0)
-    plt.plot(t_l, x_exact, label="Exact x")
-    plt.show()
+    # plt.plot(t_l, x_exact, label="Exact x")
+    # plt.show()
     f_sol = np.convolve(core_loc, x_exact)
     n_c = len(f_sol)
     b_c = h_l * n_c
@@ -54,18 +54,37 @@ def rel_err(exact, solution):
 
 
 def search_for_alpha_supp(sigma, t_l, h_l, alpha_t):
-    x_exact = x_var(t_l)
     f1, t1 = exact_solution(t_l, h_l)
     f1_n = make_noisy(f1, t1, sigma_l=sigma)
     sol_t = tikhonov_regular(f1_n, core(t_l, 0), h_l, alpha=alpha_t)
     return sol_t[:t.shape[0]]
 
-def search_for_alpha(sample_size=1000):
-    sigma1 = 1e-2
+
+def search_for_alpha(t_l, h_l, sigma_loc, sample_size=500):
+    alpha0 = 1e-3
+    alpha_out1 = []
+    x_exact = x_var(t_l)
     for i in range(sample_size):
-        f_aim = search_for_alpha_supp()
-        err = rel_err(x_exact, sol_t[:t.shape[0]])
-        opt.minimal
+        f_aim = lambda alpha: rel_err(x_exact,
+                                      search_for_alpha_supp(sigma_loc, t_l, h_l, alpha)[:t.shape[0]])
+        res = opt.minimize(f_aim, alpha0)
+        alpha_out1.append(res.x[0])
+    return alpha_out1
+
+
+def alpha_hist_output(t_l, h_l, sigma_loc):
+    alpha1 = search_for_alpha(t_l, h_l, sigma_loc)
+    f1_loc, t1_loc = exact_solution(t_l, h_l)
+    f1_n_loc = make_noisy(f1_loc, t1_loc, sigma_l=sigma_loc)
+    plt.plot(t1_loc, f1_n_loc)
+    plt.show()
+    plt.text(-7, 20,  "sigma = " + str(sigma_loc), bbox=dict(boxstyle="round",
+                   ec=(1., 0.5, 0.5),
+                   fc=(1., 0.8, 0.8),
+                   ))
+    plt.hist(np.log(np.abs(alpha1)))
+    plt.show()
+
 
 A = 0.5
 delta_t = 2 * 1e-3
@@ -79,13 +98,25 @@ h = 1e-1
 N = 1000
 t = np.linspace(a, b, N)
 
+# exact solution
+x_exact_plt = x_var(t)
+plt.plot(t, x_exact_plt, label="Exact x")
+plt.show()
+
 # noisy function
-# f1, t1 = exact_solution(t, h)
-# f1_n = make_noisy(f1, t1, sigma_l=1e-1)
-# plt.plot(t1, f1_n)
-# plt.show()
-# # finding x via regularization
-# sol_tikh = tikhonov_regular(f1_n, core(t, 0), h, alpha=1e-2)
-# plt.plot(t, x_var(t))
-# plt.plot(t, sol_tikh[:t.shape[0]], '--')
-# plt.show()
+f1, t1 = exact_solution(t, h)
+f1_n = make_noisy(f1, t1, sigma_l=1e-1)
+plt.plot(t1, f1_n)
+plt.show()
+# finding x via regularization
+sol_tikh = tikhonov_regular(f1_n, core(t, 0), h, alpha=1e-2)
+plt.plot(t, x_var(t))
+plt.plot(t, sol_tikh[:t.shape[0]], '--')
+plt.show()
+
+sigma0 = 1e-3
+sigma1 = 5e-1
+sigma2 = 1e0
+alpha_hist_output(t, h, sigma0)
+alpha_hist_output(t, h, sigma1)
+alpha_hist_output(t, h, sigma2)
